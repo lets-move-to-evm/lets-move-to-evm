@@ -1,0 +1,6 @@
+[package]
+name = "BasicCoinOriginal"
+version = "0.0.0"
+
+[dependencies]
+EvmStdlib = { local = "../../../stdlib" }
