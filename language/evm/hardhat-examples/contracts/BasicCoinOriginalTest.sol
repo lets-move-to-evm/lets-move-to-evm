@@ -48,7 +48,7 @@ contract BasicCoinOriginalTestV1 {
     }
 
     function mint(address signer, uint256 amount) public {
-        require(msg.sender == address(basicCoin), 'Unauthorized');
+        require(msg.sender == address(basicCoin), "Unauthorized");
         // emit Entered(signer);
         uint256 coin = basicCoin.mint(amount);
         // emit Coin(coin);
@@ -56,7 +56,7 @@ contract BasicCoinOriginalTestV1 {
     }
 
     function mintTo(address signer, uint256 amount, address to) public {
-        require(msg.sender == address(basicCoin), 'Unauthorized');
+        require(msg.sender == address(basicCoin), "Unauthorized");
         // emit Entered(signer);
         uint256 coin = basicCoin.mint(amount);
         // uint256 value = basicCoin.coinValue(coin);
@@ -70,7 +70,7 @@ contract BasicCoinOriginalTestV1 {
     }
 
     function withdraw(address signer, uint256 amount) public {
-        require(msg.sender == address(basicCoin), 'Unauthorized');
+        require(msg.sender == address(basicCoin), "Unauthorized");
         // emit Entered(signer);
         uint256 coin = basicCoin.withdraw(amount);
         // emit Coin(coin);
@@ -82,7 +82,7 @@ contract BasicCoinOriginalTestV1 {
     }
 
     function deposit(address signer) public {
-        require(msg.sender == address(basicCoin), 'Unauthorized');
+        require(msg.sender == address(basicCoin), "Unauthorized");
         // emit Entered(signer);
         Wrapper memory wrapper = wrappers[signer];
         // emit Coin(wrapper.coin);
@@ -101,7 +101,7 @@ contract BasicCoinOriginalTestV1 {
         uint256 amount,
         address to
     ) public {
-        require(msg.sender == address(basicCoin), 'Unauthorized');
+        require(msg.sender == address(basicCoin), "Unauthorized");
         // emit Entered(signer);
         uint256 coin = basicCoin.withdraw(amount);
         // emit Coin(coin);

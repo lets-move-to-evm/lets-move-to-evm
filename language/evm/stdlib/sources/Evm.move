@@ -18,21 +18,11 @@ module Evm::Evm {
         msg_value()
     }
 
-    public native fun address_of(acc: &signer): address;
-
-    public native fun protection_layer_signer_address(): address;
-
     /// Returns the balance, in Wei, of any account.
     public native fun balance(addr: address): U256;
 
     /// Transfers the given amount to the target account.
-    public native fun transfer(addr: address, amount: U256): bool;
-
-    /// Calls external contract.
-    public native fun call(addr: address, value: U256, data: vector<u8>): bool;
-
-    /// Calls external contract.
-    public native fun callback(data: vector<u8>): bool;
+    public native fun transfer(addr: address, amount: U256);
 
     /// Emits an event. The type passed for `E` must be annotated with #[event].
     public native fun emit<E>(e: E);

@@ -1,6 +1,0 @@
-[package]
-name = "References"
-version = "0.0.0"
-
-[dependencies]
-EvmStdlib = { local = "../../../stdlib" }

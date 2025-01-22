@@ -566,7 +566,7 @@ impl<'a> Context<'a> {
                 // U32 => "u32".to_string(),
                 U64 => "u64".to_string(),
                 U128 => "u128".to_string(),
-                U256 => "u256".to_string(),
+                // U256 => "u256".to_string(),
                 Num => "num".to_string(),
                 Address => "address".to_string(),
                 Signer => "signer".to_string(),
@@ -577,10 +577,9 @@ impl<'a> Context<'a> {
             Vector(et) => format!("vec{}", self.mangle_types(&[et.as_ref().to_owned()])),
             Struct(mid, sid, inst) => {
                 self.mangle_struct(&mid.qualified(*sid).instantiate(inst.clone()))
-            },
-            Reference(..) => "ref".to_string(),
+            }
             TypeParameter(..) | Fun(..) | Tuple(..) | TypeDomain(..) | ResourceDomain(..)
-            | Error | Var(..) => format!("<<unsupported {:?}>>", ty),
+            | Error | Var(..) | Reference(..) => format!("<<unsupported {:?}>>", ty),
         }
     }
 
@@ -641,10 +640,6 @@ impl<'a> Context<'a> {
     /// Check whether it is an abi struct or a builtin String type
     pub fn is_structs_abi(&self, st: &StructEnv<'_>) -> bool {
         attributes::is_abi_struct(st) || self.is_string(st.get_qualified_id())
-    }
-
-    pub fn is_module_defined_resource(&self, module_id: &ModuleId, struct_id: QualifiedId<StructId>) -> bool {
-        self.env.get_module(*module_id).get_structs().any(|struct_env| struct_env.get_id() == struct_id.id)
     }
 
     /// Returns whether the struct identified by module_id and struct_id is the native U256 struct.
