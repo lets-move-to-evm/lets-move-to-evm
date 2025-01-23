@@ -49,19 +49,17 @@ module.exports = {
         // opcodes: ['MLOAD', 'MSTORE'],
     },
     networks: {
-        ropsten: {
-            url: `https://eth-ropsten.alchemyapi.io/v2/${ALCHEMY_API_KEY_FOR_ROPSTEN}`,
-            accounts: [`${PRIVATE_KEY}`],
-        },
-        rinkeby: {
-            url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY_FOR_RINKEBY}`,
-            accounts: [`${PRIVATE_KEY}`],
-            // gas: 4250274,
-            // gasPrice: 2500000016
-        },
-        sepolia: {
-            url: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY_FOR_SEPOLIA}`,
-            accounts: [`${PRIVATE_KEY}`],
-        },
+        // ropsten: {
+        //     url: `https://eth-ropsten.alchemyapi.io/v2/${ALCHEMY_API_KEY_FOR_ROPSTEN}`,
+        //     accounts: [`${PRIVATE_KEY}`],
+        // },
+        // rinkeby: {
+        //     url: `https://eth-rinkeby.alchemyapi.io/v2/${ALCHEMY_API_KEY_FOR_RINKEBY}`,
+        //     accounts: [`${PRIVATE_KEY}`],
+        // },
+        // sepolia: {
+        //     url: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY_FOR_SEPOLIA}`,
+        //     accounts: [`${PRIVATE_KEY}`],
+        // },
     },
 };
