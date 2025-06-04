@@ -7,7 +7,7 @@ module Evm::basic_coin_original {
     struct Coin has key {
         value: U256
     }
-
+ 
     struct MintCapability has key {}
     
     #[create(sig=b"constructor()")]
@@ -51,6 +51,19 @@ module Evm::basic_coin_original {
     ): Coin acquires Coin {
         let account_addr = sender();
         let coin = borrow_global_mut<Coin>(account_addr);
+        require(le(amount, coin.value), b"ERC20: transfer amount exceeds balance");
+        coin.value = sub(coin.value, amount);
+        Coin { value: amount }
+    }
+
+    // Here the 'from: &signer' parameter was removed 
+    // and used protection_layer_signer_address() instead
+    #[callable(sig=b"withdrawFrom(address,uint256) returns (Coin)")]
+    public fun withdraw_from (
+        acc: address,
+        amount: U256
+    ): Coin acquires Coin {
+        let coin = borrow_global_mut<Coin>(acc);
         require(le(amount, coin.value), b"ERC20: transfer amount exceeds balance");
         coin.value = sub(coin.value, amount);
         Coin { value: amount }

@@ -1,0 +1,6 @@
+[package]
+name = "TokenOriginal"
+version = "0.0.0"
+
+[dependencies]
+EvmStdlib = { local = "../../../stdlib" }

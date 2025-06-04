@@ -1,7 +1,7 @@
 #[evm_contract]
 module Evm::basic_coin {
     use Evm::Evm::{sender, sign, require, /*address_of,*/ protection_layer_signer_address};
-    use Evm::U256::{U256, add, sub, zero, u256_from_u128, le};
+    use Evm::U256::{U256, add, sub, zero, /*u256_from_u128, */ le};
 
     struct Coin has key {
         value: U256
@@ -40,7 +40,7 @@ module Evm::basic_coin {
         to: address,
         amount: U256,
     ) acquires Coin {
-        require(to != @0x0, b"transfer to the zero address");
+        require(to != @0x0, b"Coin Module: transfer to the zero address");
         let sender_coin = withdraw(amount);
         deposit(to, sender_coin);
     }
@@ -53,7 +53,7 @@ module Evm::basic_coin {
     ): Coin acquires Coin {
         let account_addr = protection_layer_signer_address();
         let coin = borrow_global_mut<Coin>(account_addr);
-        require(le(amount, coin.value), b"ERC20: transfer amount exceeds balance");
+        require(le(amount, coin.value), b"Coin module: withdraw amount exceeds balance");
         coin.value = sub(coin.value, amount);
         Coin { value: amount }
     }
@@ -93,6 +93,19 @@ module Evm::basic_coin {
     #[callable(sig=b"coinValue(uint256) returns (uint256)"), view]
     public fun coin_value(coin_ref: &Coin): U256 {
         coin_ref.value
+    }
+
+    #[callable(sig=b"merge(uint256,uint256)")]
+    public fun merge(coin_ref: &mut Coin, coin: Coin) {
+        let Coin { value } = coin;
+        coin_ref.value = add(coin_ref.value, value);
+    }
+
+    #[callable(sig=b"extract(uint256,uint256) returns (uint256)")]
+    public fun extract(coin_ref: &mut Coin, amount: U256): Coin {
+        require(le(amount, coin_ref.value), b"Coin module: extract amount exceeds balance");
+        coin_ref.value = sub(coin_ref.value, amount);
+        Coin { value: amount }
     }
 
     #[callable(sig=b"doNothing()", view)]

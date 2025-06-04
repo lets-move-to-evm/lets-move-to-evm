@@ -53,7 +53,7 @@ contract('ProtectionLayerCosts', function (accounts) {
             //     writeEncoding
             // );
         });
-        it('Calling protection layer on external contract on transient readRef function', async function () {
+        it('Calling protection layer on external contract on readRef function', async function () {
             let readRefTransientEncoding =
                 protectionLayerHelperInterface.encodeFunctionData(
                     'readRefTransient',

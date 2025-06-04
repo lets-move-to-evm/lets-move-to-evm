@@ -1,6 +1,6 @@
 #[evm_contract]
 module Evm::protection_layer_costs {
-    use Evm::Evm::{sender, sign, require, /*address_of,*/ protection_layer_signer_address};
+    use Evm::Evm::{sign, /*address_of,*/ protection_layer_signer_address};
     use Evm::U256::{U256, zero};// , add, sub, u256_from_u128, le};
 
     struct S has key {
@@ -51,7 +51,7 @@ module Evm::protection_layer_costs {
     // sink function
     #[callable(sig=b"sink(uint256)")]
     public fun sink(s: S) {
-        let S { val } = s;
+        let S { val: _ } = s;
     }
 
     #[callable(sig=b"readRef(uint256) returns (uint256)"), view]

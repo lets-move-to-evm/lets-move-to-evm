@@ -4,6 +4,10 @@ const {
     expectEvent,
     expectRevert,
 } = require('@openzeppelin/test-helpers');
+const {
+    shouldBehaveLikeERC721,
+    shouldBehaveLikeERC721Metadata,
+} = require('./ERC721.behavior');
 
 const ERC721Mock = artifacts.require('ERC721Mock'); // A Move contract
 
@@ -46,4 +50,6 @@ contract('ERC721', function (accounts) {
             expect(await this.token.ownerOf(tokenId)).to.be.equal(this.toWhom);
         });
     });
+
+    // shouldBehaveLikeERC721('ERC721', ...accounts);
 });

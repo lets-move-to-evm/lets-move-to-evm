@@ -54,7 +54,7 @@ contract('ProtectionLayerCosts', function (accounts) {
             //     writeEncoding
             // );
         });
-        it('Calling protection layer on external contract on external readRef function', async function () {
+        it('Calling protection layer on external contract on readRef function', async function () {
             let getAndStoreExternalEncoding =
                 protectionLayerHelperInterface.encodeFunctionData(
                     'getAndStoreExternal',

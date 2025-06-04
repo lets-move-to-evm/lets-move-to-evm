@@ -24,7 +24,7 @@ contract('BasicCoin', function (accounts) {
         });
     });
 
-    xdescribe('when everything is set up', function () {
+    describe('when everything is set up', function () {
         let initialAmount = '10';
         let finalAmount = '100';
         it('should allow to manipulate a resource', async function () {

@@ -17,7 +17,7 @@ interface IBasicCoin is IProtectionLayerV2 {
     function coinValue(uint256) external view returns (uint256);
 }
 
-contract Auction {
+contract AuctionSol {
     struct Bid {
         address highestBidder;
         uint256 coin;

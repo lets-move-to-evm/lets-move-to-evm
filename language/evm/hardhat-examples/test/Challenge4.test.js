@@ -18,7 +18,7 @@ contract('BasicCoin', function (accounts) {
         await this.challenge4.register();
     });
 
-    xdescribe('when everything is set up', function () {
+    describe('when everything is set up', function () {
         let amount = '100';
         it('should allow to forge resource', async function () {
             await this.challenge4.forgeResource(amount);

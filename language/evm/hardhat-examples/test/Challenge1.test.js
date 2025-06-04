@@ -22,7 +22,7 @@ contract('BasicCoin', function (accounts) {
         });
     });
 
-    xdescribe('when everything is set up', function () {
+    describe('when everything is set up', function () {
         it('should allow to drop resource', async function () {
             await this.challenge1.dropResource();
         });
