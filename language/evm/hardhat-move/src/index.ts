@@ -166,7 +166,7 @@ class MoveBuildError {
 }
 
 async function movePackageBuild(movePath: string, packagePath: string): Promise<Result<void, MoveBuildError>> {
-    let cmd = `${movePath} build --path ${packagePath} --arch ethereum`;
+    let cmd = `${movePath} build --path ${packagePath} --arch ethereum`; // --force TO BE ADDED
 
     let [e, stdout, stderr] = await executeChildProcess(cmd);
 

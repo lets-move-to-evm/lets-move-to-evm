@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::diagnostic::Severity;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap};
 
 use itertools::Itertools;
 use regex::Regex;
@@ -117,6 +117,23 @@ impl Generator {
             self.solidity_sigs.push((solidity_unstore_external_sig.clone(), FunctionAttribute::NonPayable));
             // Add the unstoreExternal dispatcher item at the end of the function dispatcher
             self.generate_unstore_external_dispatch_item(ctx, &solidity_unstore_external_sig, &mut selectors);
+
+            // Generate getSigner signature
+            let solidity_get_signer_sig = SoliditySignature::create_get_signer_signature();
+            //  Add the getSigner signature to the list of signatures, so this will be also added to the ABI produced
+            self.solidity_sigs.push((solidity_get_signer_sig.clone(), FunctionAttribute::NonPayable));
+            // Add the getSigner dispatcher item at the end of the function dispatcher
+            self.generate_get_signer_dispatch_item(ctx, &solidity_get_signer_sig, &mut selectors);
+
+            // Generate dropRes signature
+            let solidity_drop_res_sig = SoliditySignature::create_drop_res_signature();
+            //  Add the dropRes signature to the list of signatures, so this will be also added to the ABI produced
+            self.solidity_sigs.push((solidity_drop_res_sig.clone(), FunctionAttribute::NonPayable));
+            // Add the dropRes dispatcher item at the end of the function dispatcher
+            self.generate_drop_res_dispatch_item(ctx, &solidity_drop_res_sig, &mut selectors);
+
+
+            // Generate default case
             emitln!(ctx.writer, "default { revert(0, 0) }");
         });
         let receive_exists = self.optional_receive(ctx, receiver);
@@ -345,6 +362,111 @@ impl Generator {
         });
     }
 
+    fn generate_get_signer_dispatch_item(
+        &mut self,
+        ctx: &Context,
+        solidity_sig: &SoliditySignature,
+        selectors: &mut BTreeMap<String, QualifiedId<FunId>>
+    ) {
+        let function_name = String::from("$Signer");
+        let fun_sig = String::from("getSigner()");
+        let function_selector =
+            format!("0x{:x}", Keccak256::digest(fun_sig.as_bytes()))[..10].to_string();
+        // Check selector collision
+        if let Some(other_fun) = selectors.get(&function_selector)
+        {
+            ctx.env.error(
+                &ctx.env.get_function(other_fun.clone()).get_loc(),
+                &format!(
+                    "hash collision for function selector with `{}`",
+                    ctx.env.get_function(other_fun.clone()).get_full_name_str()
+                ),
+            );
+        }
+        emitln!(ctx.writer, "case {}", function_selector);
+        ctx.emit_block(|| {
+            emitln!(ctx.writer, "// {}", fun_sig);
+            self.generate_call_value_check(ctx, REVERT_ERR_NON_PAYABLE_FUN);
+            // Call the function
+            let ret = "ret_0".to_string();
+            emitln!(ctx.writer, "let {} := {}()", ret.clone(), function_name);
+            let logical_return_types: Vec<Type> = vec![Type::Primitive(PrimitiveType::Address)];
+            let encoding_fun_name = self.generate_abi_tuple_encoding_ret(ctx, &solidity_sig, logical_return_types);
+            
+            // Prepare the return values
+            self.generate_allocate_unbounded(ctx);
+            emitln!(
+                ctx.writer,
+                "let memEnd := {}(memPos,{})",
+                encoding_fun_name,
+                ret
+            );
+            emitln!(ctx.writer, "return(memPos, sub(memEnd, memPos))");
+        });
+    }
+
+    fn generate_drop_res_dispatch_item(
+        &mut self,
+        ctx: &Context,
+        solidity_sig: &SoliditySignature,
+        selectors: &mut BTreeMap<String, QualifiedId<FunId>>
+    ) {
+        let function_name = String::from("$DropRes");
+        let fun_sig = String::from("dropRes(uint256)");
+        let function_selector =
+            format!("0x{:x}", Keccak256::digest(fun_sig.as_bytes()))[..10].to_string();
+        // Check selector collision
+        if let Some(other_fun) = selectors.get(&function_selector)
+        {
+            ctx.env.error(
+                &ctx.env.get_function(other_fun.clone()).get_loc(),
+                &format!(
+                    "hash collision for function selector with `{}`",
+                    ctx.env.get_function(other_fun.clone()).get_full_name_str()
+                ),
+            );
+        }
+        emitln!(ctx.writer, "case {}", function_selector);
+        ctx.emit_block(|| {
+            emitln!(ctx.writer, "// {}", fun_sig);
+            let storage_type: Option<QualifiedInstId<StructId>> = None;
+            self.generate_call_value_check(ctx, REVERT_ERR_NON_PAYABLE_FUN);
+            let logical_param_types: Vec<Type> = vec![Type::Primitive(PrimitiveType::U256)];
+            let param_count: u8 = 1;
+
+            let decoding_fun_name = self.generate_abi_tuple_decoding_para(
+                ctx,
+                &solidity_sig,
+                logical_param_types,
+                false,
+            );
+            let mut params = (0..param_count).map(|i| format!("param_{}", i)).join(", ");
+            let let_params = format!("let {} := ", params);
+            emitln!(
+                ctx.writer,
+                "{}{}(4, calldatasize())",
+                let_params,
+                decoding_fun_name
+            );
+            
+            params = self.add_storage_ref_param(ctx, &storage_type, params);
+            // Call the function
+            emitln!(ctx.writer, "{}({})", function_name, params);
+
+            let encoding_fun_name = self.generate_abi_tuple_encoding_ret(ctx, &solidity_sig, vec![]);
+            let rets = format!("");
+            // Prepare the return values
+            self.generate_allocate_unbounded(ctx);
+            emitln!(
+                ctx.writer,
+                "let memEnd := {}(memPos{})",
+                encoding_fun_name,
+                rets
+            );
+            emitln!(ctx.writer, "return(memPos, sub(memEnd, memPos))");
+        });
+    }
+
     fn generate_dispatch_item(
         &mut self,
         ctx: &Context,
@@ -442,7 +564,7 @@ impl Generator {
                     emitln!(ctx.writer, "{} := {}({})", param_name, res_in_name, param_name);
                     self.generate_res_in(ctx, ty.1.get_struct_id(ctx.env).unwrap());
                 }
-                else if ty.1.is_reference() {
+                else if ty.1.is_reference() && !ctx.is_storage_ref(&self.storage_type, &ty.1){
                     let struct_id = match ty.1 {
                         Type::Reference(_, type_box) => {type_box.get_struct_id(ctx.env).unwrap()}
                         _ => {panic!("")}
@@ -744,6 +866,8 @@ impl Generator {
         let res = "resource".to_string();
         let res_id = "resource_id".to_string();
         let _signer = "signer".to_string();
+        let sender = "sender".to_string();
+        let hash = "hash".to_string();
         let generate_fun = move |gen: &mut Generator, ctx: &Context|{
             emit!(ctx.writer, "({}) -> {} ", res.clone(), res_id);
             ctx.emit_block(||{
@@ -756,6 +880,16 @@ impl Generator {
                     std::iter::empty(),
                 );
                 // Increase size of H
+
+                // TODO LOZ check if the struct has drop ability and eventually do not increment H
+                // if !ctx.env.get_struct(struct_id.to_qualified_id()).get_abilities().has_drop() {
+                //     gen.call_protection_layer_builtin(
+                //         ctx, 
+                //         YulProtectionFunction::IncrementH, 
+                //         std::iter::empty(),
+                //     );
+                // }
+                
                 gen.call_protection_layer_builtin(
                     ctx, 
                     YulProtectionFunction::IncrementH, 
@@ -775,13 +909,13 @@ impl Generator {
                 //     std::iter::empty(),
                 // );
 
-                // gen.call_protection_layer_builtin_with_result(
-                //     ctx, 
-                //     "let ", 
-                //     std::iter::once("hash".to_string()), 
-                //     YulProtectionFunction::ComputeHash,
-                //     std::iter::once("signer, resource_id".to_string())
-                // );
+                gen.call_protection_layer_builtin_with_result(
+                    ctx, 
+                    "let ", 
+                    std::iter::once(hash.clone()), 
+                    YulProtectionFunction::ComputeHash,
+                    std::iter::once(format!("{}, {}", sender, res_id))
+                );
 
                 gen.save_resource(
                     ctx, 
@@ -794,7 +928,7 @@ impl Generator {
                 gen.move_to_transient(
                     ctx,
                     &struct_id,
-                    "sender".to_string(),
+                    hash.clone(),
                     res.clone()
                 );
                 // we compute the key as the hash of (0x00resID)
@@ -808,17 +942,29 @@ impl Generator {
         self.need_protection_auxiliary_function(function_name, Box::new(generate_fun));        
     }
 
-    // TODO use the same naming convention for res_id in generate_res_out and generate_res_in. Maybe check also other functions
+    // TODO LOZ use the same naming convention for res_id in generate_res_out and generate_res_in. Maybe check also other functions
     fn generate_res_in(&mut self, ctx: &Context, struct_id: QualifiedInstId<StructId>) {
         let type_hash = self.type_hash(ctx, &struct_id.to_type());
         let function_name = format!("$ResIn{:x}", type_hash);
         let res = "resource".to_string();
         let res_id = "resource_id".to_string();
         let _signer = "signer".to_string();
+        let sender = "sender".to_string();
+        let hash = "hash".to_string();
         let generate_fun = move |gen: &mut Generator, ctx: &Context|{
             emit!(ctx.writer, "({}) -> {} ", res_id.clone(), res.clone());
             ctx.emit_block(||{
                 // Decrease size of H
+
+                // TODO LOZ check if the struct has drop ability and eventually do not decrement H
+                // if !ctx.env.get_struct(struct_id.to_qualified_id()).get_abilities().has_drop() {
+                //     gen.call_protection_layer_builtin(
+                //         ctx, 
+                //         YulProtectionFunction::DecrementH, 
+                //         std::iter::empty(),
+                //     );
+                // }
+
                 gen.call_protection_layer_builtin(
                     ctx, 
                     YulProtectionFunction::DecrementH, 
@@ -838,13 +984,13 @@ impl Generator {
                 //     std::iter::empty(),
                 // );
 
-                // gen.call_protection_layer_builtin_with_result(
-                //     ctx, 
-                //     "let ", 
-                //     std::iter::once("hash".to_string()), 
-                //     YulProtectionFunction::ComputeHash,
-                //     std::iter::once(format!("{}, {}", signer, res_id))
-                // );
+                gen.call_protection_layer_builtin_with_result(
+                    ctx, 
+                    "let ", 
+                    std::iter::once(hash.clone()), 
+                    YulProtectionFunction::ComputeHash,
+                    std::iter::once(format!("{}, {}", sender, res_id))
+                );
 
                 gen.unsave_resource(
                     ctx, 
@@ -856,7 +1002,7 @@ impl Generator {
                 gen.move_from_transient(
                     ctx, 
                     &struct_id, 
-                    "sender".to_string(),
+                    hash.clone(),
                     "resource".to_string()
                 );
 
@@ -876,6 +1022,8 @@ impl Generator {
         let res_id = "res_id".to_string();
         let ref_in = "ref_in".to_string();
         let _signer = "signer".to_string();
+        let sender = "sender".to_string();
+        let hash = "hash".to_string();
         let generate_fun = move |gen: &mut Generator, ctx: &Context|{
             emit!(ctx.writer, "({}) -> {} ", res_id.clone(), ref_in.clone());
             ctx.emit_block( ||{
@@ -893,18 +1041,18 @@ impl Generator {
                 //     std::iter::empty(),
                 // );
 
-                // gen.call_protection_layer_builtin_with_result(
-                //     ctx, 
-                //     "let ", 
-                //     std::iter::once("hash".to_string()), 
-                //     YulProtectionFunction::ComputeHash,
-                //     std::iter::once(format!("{}, {}", signer, res_id))
-                // );
+                gen.call_protection_layer_builtin_with_result(
+                    ctx, 
+                    "let ", 
+                    std::iter::once("hash".to_string()), 
+                    YulProtectionFunction::ComputeHash,
+                    std::iter::once(format!("{}, {}", sender, res_id))
+                );
 
                 gen.borrow_ref(
                     ctx, 
                     &struct_id.to_type(), 
-                    "sender".to_string(),
+                    hash.clone(),
                     res_id.clone(),
                 );
             });

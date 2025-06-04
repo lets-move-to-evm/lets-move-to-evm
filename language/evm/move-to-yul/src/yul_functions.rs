@@ -320,6 +320,19 @@ StorageLoadBytes: "(offs, size) -> val {
     }
 }" dep ToWordOffs dep StorageKey dep ExtractBytes dep OverflowBytes dep LogicalNot,
 
+// Loads bytes from transient offset.
+TransientLoadBytes: "(offs, size) -> val {
+    let word_offs, byte_offs := $ToWordOffs(offs)
+    let key := $StorageKey(${LINEAR_STORAGE_GROUP}, word_offs)
+    val := $ExtractBytes(tload(key), byte_offs, size)
+    let overflow_bytes := $OverflowBytes(byte_offs, size)
+    if $LogicalNot(iszero(overflow_bytes)) {
+        key := $StorageKey(${LINEAR_STORAGE_GROUP}, add(word_offs, 1))
+        let extra_bytes := $ExtractBytes(tload(key), 0, overflow_bytes)
+        val := or(shl(shl(3, overflow_bytes), val), extra_bytes)
+    }
+}" dep ToWordOffs dep StorageKey dep ExtractBytes dep OverflowBytes dep LogicalNot,
+
 // Store bytes to storage offset.
 StorageStoreBytes: "(offs, size, bytes) {
     let word_offs, byte_offs := $ToWordOffs(offs)
@@ -337,6 +350,26 @@ StorageStoreBytes: "(offs, size, bytes) {
         sstore(key, $InjectBytes(sload(key), byte_offs, used_bytes, higher_bytes))
         key := $StorageKey(${LINEAR_STORAGE_GROUP}, add(word_offs, 1))
         sstore(key, $InjectBytes(sload(key), 0, overflow_bytes, lower_bytes))
+    }
+}" dep ToWordOffs dep StorageKey dep InjectBytes dep OverflowBytes,
+
+// Store bytes to storage offset.
+TransientStoreBytes: "(offs, size, bytes) {
+    let word_offs, byte_offs := $ToWordOffs(offs)
+    let key := $StorageKey(${LINEAR_STORAGE_GROUP}, word_offs)
+    let overflow_bytes := $OverflowBytes(byte_offs, size)
+    switch overflow_bytes
+    case 0 {
+        tstore(key, $InjectBytes(sload(key), byte_offs, size, bytes))
+    }
+    default {
+        // Shift the higher bytes to the right
+        let used_bytes := sub(size, overflow_bytes)
+        let higher_bytes := shr(used_bytes, bytes)
+        let lower_bytes := and(bytes, $MaskForSize(overflow_bytes))
+        tstore(key, $InjectBytes(sload(key), byte_offs, used_bytes, higher_bytes))
+        key := $StorageKey(${LINEAR_STORAGE_GROUP}, add(word_offs, 1))
+        tstore(key, $InjectBytes(sload(key), 0, overflow_bytes, lower_bytes))
     }
 }" dep ToWordOffs dep StorageKey dep InjectBytes dep OverflowBytes,
 
@@ -375,6 +408,15 @@ NewLinkedStorageBase: "(type_hash) -> offs {
     let handle := sload(key)
     sstore(key, add(handle, 1))
     offs := $MakeTypeStorageBase(${LINKED_STORAGE_CATEGORY}, type_hash, handle)
+}" dep MakeTypeStorageBase,
+
+// Make a new base storage offset for linked transient. This creates a new handle
+// and then calls MakeTypeStorageBase.
+NewLinkedTransientBase: "(type_hash) -> offs {
+    let key := $StorageKey(${ADMIN_STORAGE_GROUP}, ${LINKED_STORAGE_COUNTER_LOC})
+    let handle := tload(key)
+    tstore(key, add(handle, 1))
+    offs := $MakeTypeStorageBase(${TRANSIENT_STORAGE_CATEGORY}, type_hash, handle)
 }" dep MakeTypeStorageBase,
 
 // Indexes pointer by offset.
@@ -417,6 +459,11 @@ StorageLoadU8: "(offs) -> val {
     val := $StorageLoadBytes(offs, 1)
 }" dep StorageLoadBytes,
 
+// Loads u8 from transient offset.
+TransientLoadU8: "(offs) -> val {
+    val := $TransientLoadBytes(offs, 1)
+}" dep TransientLoadBytes,
+
 // Stores u8 to pointer.
 StoreU8: "(ptr, val) {
     let offs := $OffsetPtr(ptr)
@@ -440,6 +487,9 @@ StorageStoreU8: "(offs, val) {
     $StorageStoreBytes(offs, 1, val)
 }" dep StorageStoreBytes,
 
+TransientStoreU8: "(offs, val) {
+    $TransientStoreBytes(offs, 1, val)
+}" dep TransientStoreBytes,
 // ------------
 
 // Loads u64 from pointer.
@@ -464,6 +514,11 @@ StorageLoadU64: "(offs) -> val {
     val := $StorageLoadBytes(offs, 8)
 }" dep StorageLoadBytes,
 
+// Loads u64 from transient offset.
+TransientLoadU64: "(offs) -> val {
+    val := $TransientLoadBytes(offs, 8)
+}" dep TransientLoadBytes,
+
 // Stores u64 to pointer.
 StoreU64: "(ptr, val) {
     let offs := $OffsetPtr(ptr)
@@ -485,6 +540,11 @@ MemoryStoreU64: "(offs, val) {
 StorageStoreU64: "(offs, val) {
     $StorageStoreBytes(offs, 8, val)
 }" dep StorageStoreBytes,
+
+// Stores u64 to transient offset.
+TransientStoreU64: "(offs, val) {
+    $TransientStoreBytes(offs, 8, val)
+}" dep TransientStoreBytes,
 
 // ------------
 
@@ -510,6 +570,11 @@ StorageLoadU128: "(offs) -> val {
     val := $StorageLoadBytes(offs, 16)
 }" dep StorageLoadBytes,
 
+// Loads u128 from transient offset.
+TransientLoadU128: "(offs) -> val {
+    val := $TransientLoadBytes(offs, 16)
+}" dep TransientLoadBytes,
+
 // Stores u128 to pointer.
 StoreU128: "(ptr, val) {
     let offs := $OffsetPtr(ptr)
@@ -531,6 +596,11 @@ MemoryStoreU128: "(offs, val) {
 StorageStoreU128: "(offs, val) {
     $StorageStoreBytes(offs, 16, val)
 }" dep StorageStoreBytes,
+
+// Stores u128 to transient offset.
+TransientStoreU128: "(offs, val) {
+    $TransientStoreBytes(offs, 16, val)
+}" dep TransientStoreBytes,
 
 // ------------
 
@@ -556,6 +626,11 @@ StorageLoadU256: "(offs) -> val {
     val := $StorageLoadBytes(offs, 32)
 }" dep StorageLoadBytes,
 
+// Loads u256 from transient offset.
+TransientLoadU256: "(offs) -> val {
+    val := $TransientLoadBytes(offs, 32)
+}" dep TransientLoadBytes,
+
 // Stores u256 to pointer.
 StoreU256: "(ptr, val) {
     let offs := $OffsetPtr(ptr)
@@ -577,6 +652,12 @@ MemoryStoreU256: "(offs, val) {
 StorageStoreU256: "(offs, val) {
     $StorageStoreBytes(offs, 32, val)
 }" dep StorageStoreBytes,
+
+// Stores u256 to transient offset.
+TransientStoreU256: "(offs, val) {
+    $TransientStoreBytes(offs, 32, val)
+}" dep TransientStoreBytes,
+
 
 // ------------
 

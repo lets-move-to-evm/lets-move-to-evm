@@ -851,6 +851,18 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Returns the TransientLoad function for a given type.
+    #[allow(dead_code)]
+    pub fn transient_load_builtin_fun(&self, ty: &Type) -> YulFunction {
+        match self.type_size(ty.skip_reference()) {
+            1 => YulFunction::TransientLoadU8,
+            8 => YulFunction::TransientLoadU64,
+            16 => YulFunction::TransientLoadU128,
+            32 => YulFunction::TransientLoadU256,
+            _ => panic!("unexpected type size"),
+        }
+    }
+
     /// Returns the StorageStore function for a given type.
     #[allow(dead_code)]
     pub fn storage_store_builtin_fun(&self, ty: &Type) -> YulFunction {
@@ -863,6 +875,18 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Returns the TransientStore function for a given type.
+    #[allow(dead_code)]
+    pub fn transient_store_builtin_fun(&self, ty: &Type) -> YulFunction {
+        match self.type_size(ty.skip_reference()) {
+            1 => YulFunction::TransientStoreU8,
+            8 => YulFunction::TransientStoreU64,
+            16 => YulFunction::TransientStoreU128,
+            32 => YulFunction::TransientStoreU256,
+            _ => panic!("unexpected type size"),
+        }
+    }
+    
     /// Returns true of the type allocates memory.
     pub fn type_allocates_memory(&self, ty: &Type) -> bool {
         use Type::*;

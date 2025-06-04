@@ -80,6 +80,9 @@ SaveSigner: "() {
     tstore(0x1, caller())
 }",
 GetSigner: "() -> addr {
+    if iszero(tload(0x1)) {
+        $Abort2(7)
+    }
     addr := tload(0x1)
 }",
 DeleteSigner: "() {
@@ -132,7 +135,7 @@ NewResourceId: "() -> id {
     sstore(0x6, add(id, 1))
 }",
 
-// TODO check Abort codes
+// TODO LOZ check Abort codes
 // Validation function
 Validate: "() -> flag {
     $AbortProtected()
@@ -155,7 +158,7 @@ StoreTypeHash: "(resId, typeHash) {
     mstore(add(base, 0x20), 0x00)
     let key := keccak256(base, 0x40)
     mstore(base, key)
-    log0(base, 0x20)
+    // log0(base, 0x20)
     sstore(key, typeHash)
 }" dep Malloc2,
 
@@ -165,7 +168,7 @@ GetTypeHash: "(resId) -> typeHash {
     mstore(add(base, 0x20), 0x00)
     let key := keccak256(base, 0x40)
     mstore(base, key)
-    log0(base, 0x20)
+    // log0(base, 0x20)
     typeHash := sload(key)
 }" dep Malloc2,
 
@@ -175,7 +178,7 @@ RemoveTypeHash: "(resId) {
     mstore(add(base, 0x20), 0x00)
     let key := keccak256(base, 0x40)
     mstore(base, key)
-    log0(base, 0x20)
+    // log0(base, 0x20)
     sstore(key, 0)
 }" dep Malloc2,
 
@@ -183,7 +186,7 @@ ComputeHash: "(addr, resId) -> hash {
     let base := $Malloc2(0x40)
     mstore(base, addr)
     mstore(add(base, 0x20), resId)
-    hash := keccak256(base, 0x00)
+    hash := keccak256(base, 0x40)
 }" dep Malloc2,
 
 AbiDecodeProtectionLayer: "(headStart, dataEnd) -> value0, value1 {

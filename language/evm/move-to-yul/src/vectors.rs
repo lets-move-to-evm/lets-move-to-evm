@@ -154,6 +154,140 @@ impl Generator {
         emitln!(ctx.writer, "}");
     }
 
+    pub(crate) fn move_vector_to_transient(
+        &mut self,
+        ctx: &Context,
+        vector_type: &Type,
+        src: String,
+        dst: String,
+        clean_flag: bool,
+    ) {
+        let elem_type = get_elem_type(vector_type).expect("not vector type");
+        let elem_type_size = ctx.type_size(&elem_type);
+
+        // Add hash to variable names to avoid naming collisions.
+        let hash = self.type_hash(ctx, vector_type);
+        let size_name = format!("$size_{}", hash);
+        let offs_name = format!("$offs_{}", hash);
+        let data_size_name = format!("$data_size_{}", hash);
+        let data_src_name = format!("$data_src_{}", hash);
+        let data_dst_name = format!("$data_dst_{}", hash);
+
+        // Load size of the vectors
+        emitln!(
+            ctx.writer,
+            "let {} := {}",
+            size_name,
+            self.call_builtin_str(
+                ctx,
+                YulFunction::MemoryLoadU64,
+                std::iter::once(src.clone())
+            )
+        );
+
+        // Calculate the size of all the data
+        emitln!(
+            ctx.writer,
+            "let {} := mul({}, {})",
+            data_size_name,
+            size_name,
+            elem_type_size
+        );
+
+        // Move vector metadata to the storage location
+        self.call_builtin(
+            ctx,
+            YulFunction::AlignedTransientStore,
+            vec![dst.clone(), format!("mload({})", src)].into_iter(),
+        );
+
+        // Calculate the start of actual vector data at memory and storage location
+        emitln!(
+            ctx.writer,
+            "let {} := add({}, {})",
+            data_src_name,
+            src,
+            VECTOR_METADATA_SIZE
+        );
+        emitln!(
+            ctx.writer,
+            "let {} := add({}, {})",
+            data_dst_name,
+            dst,
+            VECTOR_METADATA_SIZE
+        );
+
+        // Loops through the vector and move elements
+        emitln!(
+            ctx.writer,
+            "for {{ let {} := 0 }} lt({}, {}) {{ {} := add({}, 32)}} {{",
+            offs_name,
+            offs_name,
+            data_size_name,
+            offs_name,
+            offs_name,
+        );
+        ctx.writer.indent();
+        if ctx.type_allocates_memory(&elem_type) {
+            ctx.emit_block(|| {
+                let linked_src_name = format!("$linked_src_{}", self.type_hash(ctx, &elem_type));
+                let linked_dst_name = format!("$linked_dst_{}", self.type_hash(ctx, &elem_type));
+
+                // Load the pointer to the linked memory.
+                emitln!(
+                    ctx.writer,
+                    "let {} := mload(add({}, {}))",
+                    linked_src_name,
+                    offs_name,
+                    data_src_name.clone(),
+                );
+                self.create_and_move_data_to_linked_transient(
+                    ctx,
+                    &elem_type,
+                    linked_src_name,
+                    linked_dst_name.clone(),
+                    clean_flag,
+                );
+                // Store the result at the destination
+                self.call_builtin(
+                    ctx,
+                    YulFunction::AlignedTransientStore,
+                    vec![
+                        format!("add({}, {})", data_dst_name, offs_name),
+                        linked_dst_name,
+                    ]
+                    .into_iter(),
+                )
+            });
+        } else {
+            self.call_builtin(
+                ctx,
+                YulFunction::AlignedTransientStore,
+                vec![
+                    format!("add({}, {})", data_dst_name, offs_name),
+                    format!("mload(add({}, {}))", data_src_name, offs_name),
+                ]
+                .into_iter(),
+            );
+        }
+
+        // Free ptr
+        if clean_flag {
+            self.call_builtin(
+                ctx,
+                YulFunction::Free,
+                vec![
+                    src,
+                    format!("add({}, {})", data_size_name, VECTOR_METADATA_SIZE),
+                ]
+                .into_iter(),
+            );
+        }
+
+        ctx.writer.unindent();
+        emitln!(ctx.writer, "}");
+    }
+
     pub(crate) fn move_vector_to_memory(
         &mut self,
         ctx: &Context,
@@ -334,6 +468,188 @@ impl Generator {
         ctx.writer.unindent();
         emitln!(ctx.writer, "}");
     }
+
+    pub(crate) fn move_vector_from_transient_to_memory(
+        &mut self,
+        ctx: &Context,
+        vector_type: &Type,
+        src: String,
+        dst: String,
+        clean_flag: bool, // whether to clean the storage
+    ) {
+        let elem_type = get_elem_type(vector_type).expect("not vector type");
+        let elem_type_size = ctx.type_size(&elem_type);
+
+        // Add hash to variable names to avoid naming collisions.
+        let hash = self.type_hash(ctx, vector_type);
+        let size_name = format!("$size_{}", hash);
+        let capacity_name = format!("$capacity_{}", hash);
+        let data_size_name = format!("$data_size_{}", hash);
+        let data_src_name = format!("$data_src_{}", hash);
+        let data_dst_name = format!("$data_dst_{}", hash);
+        let offs_name = format!("$offs_{}", hash);
+
+        // Load size of the vector
+        emitln!(
+            ctx.writer,
+            "let {} := {}",
+            size_name,
+            self.call_builtin_str(
+                ctx,
+                YulFunction::TransientLoadU64,
+                std::iter::once(src.clone())
+            )
+        );
+
+        // Calculate the closest power of two that's greater than the size we loaded on the
+        // last line. We will allocate space for this number of elements in the memory.
+        emitln!(
+            ctx.writer,
+            "let {} := {}",
+            capacity_name,
+            self.call_builtin_str(
+                ctx,
+                YulFunction::ClosestGreaterPowerOfTwo,
+                std::iter::once(size_name.clone())
+            )
+        );
+
+        emitln!(
+            ctx.writer,
+            "{} := {}",
+            dst,
+            self.call_builtin_str(
+                ctx,
+                YulFunction::Malloc,
+                std::iter::once(format!(
+                    "add({}, mul({}, {}))",
+                    VECTOR_METADATA_SIZE, capacity_name, elem_type_size
+                ))
+            )
+        );
+
+        // Calculate size of the vector data
+        emitln!(
+            ctx.writer,
+            "let {} := mul({}, {})",
+            data_size_name,
+            size_name,
+            elem_type_size
+        );
+
+        // Move metadata to memory
+        emitln!(
+            ctx.writer,
+            "mstore({}, {})",
+            dst,
+            self.call_builtin_str(
+                ctx,
+                YulFunction::AlignedTransientLoad,
+                std::iter::once(src.clone()),
+            )
+        );
+
+        // Store new capacity in memory
+        self.call_builtin(
+            ctx,
+            YulFunction::MemoryStoreU64,
+            vec![format!("add({}, 8)", dst), capacity_name].into_iter(),
+        );
+
+        // Calculate locations to load data from and move data to
+        emitln!(
+            ctx.writer,
+            "let {} := add({}, {})",
+            data_src_name,
+            src,
+            VECTOR_METADATA_SIZE
+        );
+        emitln!(
+            ctx.writer,
+            "let {} := add({}, {})",
+            data_dst_name,
+            dst,
+            VECTOR_METADATA_SIZE
+        );
+
+        // Loop through the vector and move elements to memory
+        emitln!(
+            ctx.writer,
+            "for {{ let {} := 0 }} lt({}, {}) {{ {} := add({}, 32)}} {{",
+            offs_name,
+            offs_name,
+            data_size_name,
+            offs_name,
+            offs_name,
+        );
+
+        ctx.writer.indent();
+        if ctx.type_allocates_memory(&elem_type) {
+            ctx.emit_block(|| {
+                let src_ptr = format!("add({}, {})", data_src_name, offs_name);
+                let dst_ptr = format!("add({}, {})", data_dst_name, offs_name);
+                let hash = self.type_hash(ctx, &elem_type);
+                let linked_src_name = format!("$linked_src_{}", hash);
+                let linked_dst_name = format!("$linked_dst_{}", hash);
+
+                // Load the pointer to the linked storage.
+                let load_call = self.call_builtin_str(
+                    ctx,
+                    YulFunction::AlignedTransientLoad,
+                    std::iter::once(src_ptr.clone()),
+                );
+
+                emitln!(ctx.writer, "let {} := {}", linked_src_name, load_call);
+                // Declare where to store the result and recursively move
+                emitln!(ctx.writer, "let {}", linked_dst_name);
+                self.move_data_from_linked_transient(
+                    ctx,
+                    &elem_type,
+                    linked_src_name,
+                    linked_dst_name.clone(),
+                    clean_flag,
+                );
+                // Store the result at the destination.
+                emitln!(ctx.writer, "mstore({}, {})", dst_ptr, linked_dst_name);
+                // Clear the storage to get a refund
+                if clean_flag {
+                    self.call_builtin(
+                        ctx,
+                        YulFunction::AlignedTransientStore,
+                        vec![src_ptr, 0.to_string()].into_iter(),
+                    );
+                }
+            });
+        } else {
+            let load_call = self.call_builtin_str(
+                ctx,
+                YulFunction::AlignedTransientLoad,
+                std::iter::once(format!("add({}, {})", data_src_name, offs_name)),
+            );
+            emitln!(
+                ctx.writer,
+                "mstore(add({}, {}), {})",
+                data_dst_name,
+                offs_name,
+                load_call
+            );
+            // fill storage with 0s
+            if clean_flag {
+                self.call_builtin(
+                    ctx,
+                    YulFunction::AlignedTransientStore,
+                    vec![
+                        format!("add({}, {})", data_src_name, offs_name),
+                        0.to_string(),
+                    ]
+                    .into_iter(),
+                );
+            }
+        }
+        ctx.writer.unindent();
+        emitln!(ctx.writer, "}");
+    }
+
 }
 
 impl NativeFunctions {

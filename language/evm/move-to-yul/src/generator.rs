@@ -549,6 +549,8 @@ impl Generator {
         FunctionGenerator::run_protection_generation(self, ctx);
         FunctionGenerator::run_store_external(self, ctx);
         FunctionGenerator::run_unstore_external(self, ctx);
+        FunctionGenerator::run_get_signer(self, ctx);
+        FunctionGenerator::run_drop_res(self, ctx);
     }
 
     /// Generate code for a function. This delegates to the function generator.
