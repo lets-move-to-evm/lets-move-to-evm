@@ -19,7 +19,7 @@ Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
 BOOGIE_VERSION=2.15.8
-SOLC_VERSION="v0.8.11+commit.d7f03943"
+SOLC_VERSION="v0.8.26+commit.8a97fa7a"
 
 SCRIPT_PATH="$(cd "$(dirname "$0")" >/dev/null 2>&1 && pwd)"
 cd "$SCRIPT_PATH/.." || exit
