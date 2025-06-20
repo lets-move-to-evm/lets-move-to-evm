@@ -204,20 +204,6 @@ function install_tidy {
   fi
 }
 
-function install_gcc_powerpc_linux_gnu {
-  PACKAGE_MANAGER=$1
-  #Differently named packages for gcc-powerpc-linux-gnu
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]] || [[ "$PACKAGE_MANAGER" == "yum" ]]; then
-    install_pkg gcc-powerpc-linux-gnu "$PACKAGE_MANAGER"
-  fi
-  #if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
-  #  install_pkg powerpc-linux-gnu-gcc "$PACKAGE_MANAGER"
-  #fi
-  #if [[ "$PACKAGE_MANAGER" == "apk" ]] || [[ "$PACKAGE_MANAGER" == "brew" ]]; then
-  #  TODO
-  #fi
-}
-
 function install_lld {
   # Right now, only install lld for linux
   if [[ "$(uname)" == "Linux" ]]; then
@@ -604,7 +590,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
 
   install_lld
 
-  # install_gcc_powerpc_linux_gnu "$PACKAGE_MANAGER"
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
