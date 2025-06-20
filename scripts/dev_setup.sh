@@ -604,7 +604,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
 
   install_lld
 
-  install_gcc_powerpc_linux_gnu "$PACKAGE_MANAGER"
+  # install_gcc_powerpc_linux_gnu "$PACKAGE_MANAGER"
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
